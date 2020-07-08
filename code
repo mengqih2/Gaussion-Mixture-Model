@@ -1,0 +1,90 @@
+import sys
+import math
+line_count = 0
+x = []
+mu = []
+for line in sys.stdin:
+    if line_count == 0:
+        N = int(line.split()[0])
+        K = int(line.split()[1])
+        line_count += 1
+    elif line_count <= N:
+        temp_x = line.split()
+        temp_x = [float(i) for i in temp_x] 
+        x.append(temp_x)
+        line_count += 1
+    else:
+        temp_mu = line.split()
+        temp_mu = [float(i) for i in temp_mu] 
+        mu.append(temp_mu)
+def det(sigma):
+    return sigma[0][0]*sigma[1][1] - sigma[1][0]*sigma[0][1]
+def inv(sigma):
+    d = det(sigma)
+    return [[sigma[1][1]/d, -1 * sigma[0][1]/d ], [-1 *sigma[1][0]/d, sigma[0][0]/d]]
+def multiply(matrix, vec):
+    x = vec[0]
+    y = vec[1]
+    a = matrix[0][0]
+    b = matrix[0][1]
+    c = matrix[1][0]
+    d = matrix[1][1]
+    return x**2*a+x*y*(b+c)+y**2*d
+def find_prob(x, sigma, mu):
+    d = det(sigma)
+    temp_diff = [0,0]
+    temp_diff[0] = x[0] - mu[0]
+    temp_diff[1] = x[1] - mu[1]
+    inv_matrix = inv(sigma)
+    numerator = math.exp(-0.5 * multiply(inv_matrix, temp_diff))
+    denominator = ((2* math.pi)**2 * d)**0.5
+    return numerator/denominator
+def e_step(x, pi, mu, sigma):
+    A = [[0 for i in range(K)] for j in range(N)]
+    for n in range(N):
+        for k in range(K):
+            prob = find_prob(x[n], sigma[k], mu[k]) * pi[k]
+            A[n][k] = prob
+    for n in range(N):
+        row_sum = 0
+        for k in range(K):
+            row_sum += A[n][k]
+        for k in range(K):
+            A[n][k] /= row_sum
+    return A
+def m_step(x, a):
+    mu = [[0 for i in range(2)] for j in range(K)]
+    pi = [0 for i in range(K)]
+    cov = [[[0,0],[0,0]] for i in range(K)]
+    for k in range(K):
+        col_sum = 0
+        for n in range(N):
+            col_sum += a[n][k]
+        for d in range(2):
+            sum_temp = 0
+            for n in range(N):
+                temp_multiply = a[n][k] * x[n][d]
+                sum_temp += temp_multiply
+            mu[k][d] = sum_temp/col_sum
+            # print(mu[k][d])
+        for n in range(N):
+            cov[k][0][0] += a[n][k] * (x[n][0]-mu[k][0])**2/ col_sum
+            cov[k][0][1] += a[n][k] * (x[n][0]-mu[k][0])*(x[n][1]-mu[k][1])/ col_sum
+            cov[k][1][0] += a[n][k] * (x[n][0]-mu[k][0])*(x[n][1]-mu[k][1])/ col_sum
+            cov[k][1][1] += a[n][k] * (x[n][1]-mu[k][1])**2/ col_sum
+        pi[k] = col_sum / N
+    return pi, mu, cov
+pi =[1 / K for i in range(K)]
+cov = [[[1,0],[0,1]] for i in range(K)]
+iters = 5
+for i in range(iters):
+    a = e_step(x, pi, mu, cov)
+    pi, mu, cov = m_step(x, a)
+for i in range(len(a)):
+    best_prob = -999
+    best_label = -1
+    for k in range(K):
+        if a[i][k] > best_prob:
+            best_label = k
+            best_prob = a[i][k]
+    print(best_label)
